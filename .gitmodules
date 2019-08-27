@@ -1,0 +1,3 @@
+[submodule "triSYCL"]
+	path = triSYCL
+	url = ../../triSYCL/triSYCL

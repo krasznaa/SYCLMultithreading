@@ -13,13 +13,35 @@ set( CMAKE_CXX_STANDARD 17 CACHE STRING
 set( CMAKE_CXX_EXTENSIONS FALSE CACHE BOOL
   "Disable the C++ extensions of the compiler" )
 
+# Rely on FindBoost.cmake for finding Boost...
+set( Boost_NO_BOOST_CMAKE ON CACHE BOOL
+  "Disable using the Boost CMake configuration" )
+
 # Make sure that both TBB and SYCL are available.
 find_package( TBB REQUIRED )
-find_package( SYCL REQUIRED )
+find_package( SYCL )
+find_package( Boost COMPONENTS chrono log filesystem )
 
 # Build the executable.
 add_executable( sycl_multithreading sycl_multithreading.cxx )
+
+# Set up its dependence on TBB.
 target_include_directories( sycl_multithreading PRIVATE ${TBB_INCLUDE_DIRS} )
 target_link_libraries( sycl_multithreading PRIVATE ${TBB_LIBRARIES} )
-target_compile_options( sycl_multithreading PRIVATE ${SYCL_FLAGS} )
-target_link_options( sycl_multithreading PRIVATE ${SYCL_FLAGS} )
+
+# Depending on whether the selected compiler supports SYCL out of the box or
+# not, use either the compiler, or triSYCL for the SYCL functionality.
+if( SYCL_FOUND )
+  message( STATUS "Using the SYCL capability of the compiler" )
+  target_compile_options( sycl_multithreading PRIVATE ${SYCL_FLAGS} )
+  target_link_options( sycl_multithreading PRIVATE ${SYCL_FLAGS} )
+elseif( Boost_FOUND )
+  message( STATUS "Using triSYCL from: ${CMAKE_SOURCE_DIR}/triSYCL" )
+  target_include_directories( sycl_multithreading PRIVATE
+    ${CMAKE_SOURCE_DIR}/triSYCL/include ${Boost_INCLUDE_DIRS} )
+  target_link_libraries( sycl_multithreading PRIVATE
+    ${Boost_LIBRARIES} )
+else()
+  message( SEND_ERROR "Either a SYCL capable compiler or Boost is necessary "
+    "for the build" )
+endif()
