@@ -43,7 +43,7 @@ public:
 
       // Run a calculation on the buffer using SYCL.
       cl::sycl::range< 1 > workItems( buffer.get_count() );
-      queue.submit( [&]( cl::sycl::handler& handler ) {
+      auto event = queue.submit( [&]( cl::sycl::handler& handler ) {
             auto accessor =
                buffer.get_access< mode::read_write >( handler );
             handler.parallel_for< class Dummy >( workItems,
@@ -56,6 +56,7 @@ public:
                                                     }
                                                  } );
          } );
+      event.wait();
 
       // Put the queue back into the pool.
       m_queuePool->push( queue );
