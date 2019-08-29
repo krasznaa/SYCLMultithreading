@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 /// Type of the queue pool
-typedef tbb::concurrent_bounded_queue< cl::sycl::queue > QueuePool_t;
+typedef tbb::concurrent_bounded_queue< cl::sycl::queue* > QueuePool_t;
 
 /// Task testing the parallel performance of SYCL
 class SYCLCalcTask {
@@ -38,12 +38,12 @@ public:
       }
 
       // Get an available queue from the pool.
-      cl::sycl::queue queue;
+      cl::sycl::queue* queue;
       m_queuePool->pop( queue );
 
       // Run a calculation on the buffer using SYCL.
       cl::sycl::range< 1 > workItems( buffer.get_count() );
-      auto event = queue.submit( [&]( cl::sycl::handler& handler ) {
+      auto event = queue->submit( [&]( cl::sycl::handler& handler ) {
             auto accessor =
                buffer.get_access< mode::read_write >( handler );
             handler.parallel_for< class Dummy >( workItems,
@@ -86,7 +86,7 @@ int main() {
    QueuePool_t queuePool;
    cl::sycl::host_selector deviceSelector;
    for( std::size_t i = 0; i < CPU_THREADS; ++i ) {
-      queuePool.emplace( deviceSelector );
+      queuePool.push( new cl::sycl::queue( deviceSelector ) );
    }
 
    // Launch a bunch of calculations.
@@ -101,6 +101,12 @@ int main() {
       std::cout << "Processed " << counter.load() << " / "
                 << N_CALCULATIONS << " calculations..." << std::endl;
       sleep( 1 );
+   }
+
+   // Delete all of the SYCL queues.
+   cl::sycl::queue* queue = nullptr;
+   while( queuePool.try_pop( queue ) ) {
+      delete queue;
    }
 
    // Return gracefully.
