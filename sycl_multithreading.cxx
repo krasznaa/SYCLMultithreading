@@ -1,5 +1,8 @@
 // Copyright (C) 2002-2019 CERN for the benefit of the ATLAS collaboration
 
+// Local include(s).
+#include "AcceleratorSelector.h"
+
 // SYCL include(s).
 #include <CL/sycl.hpp>
 
@@ -9,6 +12,7 @@
 // System include(s).
 #include <atomic>
 #include <iostream>
+#include <memory>
 #include <unistd.h>
 
 /// Type of the queue pool
@@ -32,9 +36,11 @@ public:
       // Create a large buffer of floating point numbers.
       static const std::size_t BUFFER_SIZE = 1000000;
       cl::sycl::buffer< cl::sycl::cl_float > buffer( BUFFER_SIZE );
-      auto bufferWriter = buffer.get_access< mode::write >();
-      for( std::size_t i = 0; i < buffer.get_count(); ++i ) {
-         bufferWriter[ i ] = 1.5f * i;
+      {
+         auto bufferWriter = buffer.get_access< mode::write >();
+         for( std::size_t i = 0; i < buffer.get_count(); ++i ) {
+            bufferWriter[ i ] = 1.5f * i;
+         }
       }
 
       // Get an available queue from the pool.
@@ -48,7 +54,7 @@ public:
                buffer.get_access< mode::read_write >( handler );
             handler.parallel_for< class Dummy >( workItems,
                                                  [=]( cl::sycl::id< 1 > id ) {
-                                                    for( int i = 0; i < 100;
+                                                    for( int i = 0; i < 1000;
                                                          ++i ) {
                                                        accessor[ id ] +=
                                                           1.23 * ( accessor[ id ] +
@@ -77,16 +83,54 @@ private:
 
 int main() {
 
-   // The number of CPU threads to use.
+   // The number of CPU threads to use
    static const std::size_t CPU_THREADS = 4;
    // The number of calculations to perform
    static const std::size_t N_CALCULATIONS = 100;
+   // Whether to use the host driver or not
+   static const bool USE_HOST = false;
 
    // Set up the SYCL queue pool.
    QueuePool_t queuePool;
-   cl::sycl::host_selector deviceSelector;
-   for( std::size_t i = 0; i < CPU_THREADS; ++i ) {
-      queuePool.push( new cl::sycl::queue( deviceSelector ) );
+   cl::sycl::host_selector hostSelector;
+   cl::sycl::cpu_selector cpuSelector;
+   AcceleratorSelector accSelector;
+#ifndef TRISYCL_CL_SYCL_HPP
+   std::cout << "Using the following SYCL queue(s):" << std::endl;
+#endif // not TRISYCL_CL_SYCL_HPP
+   for( std::size_t i = 0; i < 2; ++i ) {
+      try {
+         auto queue = std::make_unique< cl::sycl::queue >( accSelector );
+ #ifndef TRISYCL_CL_SYCL_HPP
+         std::cout << "  - "
+                   << queue->get_device().get_info< cl::sycl::info::device::name >()
+                   << std::endl;
+#endif // not TRISYCL_CL_SYCL_HPP
+         queuePool.push( queue.release() );
+      } catch( const cl::sycl::exception& ) {}
+   }
+   for( std::size_t i = 0; i < 2; ++i ) {
+      try {
+         auto queue = std::make_unique< cl::sycl::queue >( cpuSelector );
+#ifndef TRISYCL_CL_SYCL_HPP
+         std::cout << "  - "
+                   << queue->get_device().get_info< cl::sycl::info::device::name >()
+                   << std::endl;
+#endif // not TRISYCL_CL_SYCL_HPP
+         queuePool.push( queue.release() );
+      } catch( const cl::sycl::exception& ) {}
+   }
+   if( USE_HOST ) {
+      for( std::size_t i = 0; i < 2; ++i ) {
+         queuePool.push( new cl::sycl::queue( hostSelector ) );
+         std::cout << "  - Host" << std::endl;
+      }
+   }
+
+   // Make sure that at least some queues were set up.
+   if( queuePool.size() == 0 ) {
+      std::cerr << "Didn't manage to set up any SYCL queues!" << std::endl;
+      return 1;
    }
 
    // Launch a bunch of calculations.

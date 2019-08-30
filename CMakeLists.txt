@@ -23,7 +23,8 @@ find_package( TBB REQUIRED )
 find_package( SYCL )
 
 # Build the executable.
-add_executable( sycl_multithreading sycl_multithreading.cxx )
+add_executable( sycl_multithreading sycl_multithreading.cxx
+  AcceleratorSelector.h AcceleratorSelector.cxx )
 
 # Set up its dependence on TBB.
 target_include_directories( sycl_multithreading PRIVATE ${TBB_INCLUDE_DIRS} )
