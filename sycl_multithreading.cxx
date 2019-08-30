@@ -90,6 +90,9 @@ int main() {
    // Whether to use the host driver or not
    static const bool USE_HOST = false;
 
+   // (Try to) Maximise the number of threads TBB may use.
+   tbb::task_scheduler_init init( CPU_THREADS );
+
    // Set up the SYCL queue pool.
    QueuePool_t queuePool;
    cl::sycl::host_selector hostSelector;
