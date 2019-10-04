@@ -7,6 +7,7 @@
 #include <CL/sycl.hpp>
 
 // TBB include(s).
+#define __TBB_LEGACY_MODE 1
 #include <tbb/tbb.h>
 
 // System include(s).
