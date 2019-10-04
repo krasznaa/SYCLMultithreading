@@ -23,7 +23,7 @@ foreach( _comp ${_components} )
    # Look for this library.
    find_library( TBB_${_comp}_LIBRARY
       NAMES ${_comp}
-      PATH_SUFFIXES "lib" "lib64"
+      PATH_SUFFIXES "lib" "lib64" "lib/intel64/gcc4.8"
       HINTS ${TBBROOT} ENV TBBROOT
       DOC "Path to the ${_comp} TBB library" )
    mark_as_advanced( TBB_${_comp}_LIBRARY )
