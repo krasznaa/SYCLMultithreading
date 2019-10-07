@@ -7,7 +7,6 @@
 #include <CL/sycl.hpp>
 
 // TBB include(s).
-#define __TBB_LEGACY_MODE 1
 #include <tbb/tbb.h>
 
 // System include(s).
@@ -92,7 +91,8 @@ int main() {
    static const bool USE_HOST = false;
 
    // (Try to) Maximise the number of threads TBB may use.
-   tbb::task_scheduler_init init( CPU_THREADS );
+   tbb::global_control init( tbb::global_control::max_allowed_parallelism,
+                             CPU_THREADS );
 
    // Set up the SYCL queue pool.
    QueuePool_t queuePool;
@@ -105,7 +105,7 @@ int main() {
    for( std::size_t i = 0; i < 2; ++i ) {
       try {
          auto queue = std::make_unique< cl::sycl::queue >( accSelector );
- #ifndef TRISYCL_CL_SYCL_HPP
+#ifndef TRISYCL_CL_SYCL_HPP
          std::cout << "  - "
                    << queue->get_device().get_info< cl::sycl::info::device::name >()
                    << std::endl;
