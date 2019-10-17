@@ -7,7 +7,9 @@
 #include <CL/sycl.hpp>
 
 // TBB include(s).
-#include <tbb/tbb.h>
+#include <tbb/concurrent_queue.h>
+#include <tbb/global_control.h>
+#include <tbb/task_arena.h>
 
 // System include(s).
 #include <atomic>
@@ -92,7 +94,7 @@ int main() {
 
    // (Try to) Maximise the number of threads TBB may use.
    tbb::global_control init( tbb::global_control::max_allowed_parallelism,
-                             CPU_THREADS );
+                             CPU_THREADS + 1 );
 
    // Set up the SYCL queue pool.
    QueuePool_t queuePool;
