@@ -25,5 +25,5 @@ int AcceleratorSelector::operator()( const cl::sycl::device& device ) const {
    if( device.is_accelerator() ) {
       return 400;
    }
-   return 1;
+   return -1;
 }
