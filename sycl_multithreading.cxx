@@ -83,18 +83,42 @@ private:
 
 }; // class SYCLCalcTask
 
-int main() {
+int main( int argc, char* argv[]) {
 
-   // The number of CPU threads to use
-   static const std::size_t CPU_THREADS = 4;
-   // The number of calculations to perform
-   static const std::size_t N_CALCULATIONS = 100;
-   // Whether to use the host driver or not
-   static const bool USE_HOST = false;
+   // Read in the command line arguments.
+   std::size_t cpuThreads = 4;
+   std::size_t hostQueues = 0;
+   std::size_t cpuQueues = 2;
+   std::size_t gpuQueues = 2;
+   std::size_t nCalc = 100;
+
+   int opt = 0;
+   while( ( opt = getopt( argc, argv, "t:h:c:g:n:" ) ) != -1 ) {
+      switch( opt ) {
+      case 't':
+         cpuThreads = atoi( optarg );
+         break;
+      case 'h':
+         hostQueues = atoi( optarg );
+         break;
+      case 'c':
+         cpuQueues = atoi( optarg );
+         break;
+      case 'g':
+         gpuQueues = atoi( optarg );
+         break;
+      case 'n':
+         nCalc = atoi( optarg );
+         break;
+      default:
+         std::cerr << "Incorrect argument. Check source code." << std::endl;
+         return EXIT_FAILURE;
+      }
+   }
 
    // (Try to) Maximise the number of threads TBB may use.
    tbb::global_control init( tbb::global_control::max_allowed_parallelism,
-                             CPU_THREADS + 1 );
+                             cpuThreads + 1 );
 
    // Set up the SYCL queue pool.
    QueuePool_t queuePool;
@@ -104,7 +128,7 @@ int main() {
 #ifndef TRISYCL_CL_SYCL_HPP
    std::cout << "Using the following SYCL queue(s):" << std::endl;
 #endif // not TRISYCL_CL_SYCL_HPP
-   for( std::size_t i = 0; i < 2; ++i ) {
+   for( std::size_t i = 0; i < gpuQueues; ++i ) {
       try {
          auto queue = std::make_unique< cl::sycl::queue >( accSelector );
 #ifndef TRISYCL_CL_SYCL_HPP
@@ -115,7 +139,7 @@ int main() {
          queuePool.push( queue.release() );
       } catch( const cl::sycl::exception& ) {}
    }
-   for( std::size_t i = 0; i < 2; ++i ) {
+   for( std::size_t i = 0; i < cpuQueues; ++i ) {
       try {
          auto queue = std::make_unique< cl::sycl::queue >( cpuSelector );
 #ifndef TRISYCL_CL_SYCL_HPP
@@ -126,30 +150,28 @@ int main() {
          queuePool.push( queue.release() );
       } catch( const cl::sycl::exception& ) {}
    }
-   if( USE_HOST ) {
-      for( std::size_t i = 0; i < 2; ++i ) {
-         queuePool.push( new cl::sycl::queue( hostSelector ) );
-         std::cout << "  - Host" << std::endl;
-      }
+   for( std::size_t i = 0; i < hostQueues; ++i ) {
+      queuePool.push( new cl::sycl::queue( hostSelector ) );
+      std::cout << "  - Host" << std::endl;
    }
 
    // Make sure that at least some queues were set up.
    if( queuePool.size() == 0 ) {
       std::cerr << "Didn't manage to set up any SYCL queues!" << std::endl;
-      return 1;
+      return EXIT_FAILURE;
    }
 
    // Launch a bunch of calculations.
    std::atomic_uint counter = 0;
-   tbb::task_arena arena( CPU_THREADS, 0 );
-   for( std::size_t i = 0; i < N_CALCULATIONS; ++i ) {
+   tbb::task_arena arena( cpuThreads, 0 );
+   for( std::size_t i = 0; i < nCalc; ++i ) {
       arena.enqueue( SYCLCalcTask( queuePool, counter ) );
    }
 
    // Wait for the calculations to finish.
-   while( counter.load() < N_CALCULATIONS ) {
+   while( counter.load() < nCalc ) {
       std::cout << "Processed " << counter.load() << " / "
-                << N_CALCULATIONS << " calculations..." << std::endl;
+                << nCalc << " calculations..." << std::endl;
       sleep( 1 );
    }
 
